@@ -181,6 +181,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .di-name.strike{text-decoration:line-through;opacity:0.6}
 .di-time{font-size:11px;opacity:0.7;margin-top:1px}
 .di-region{font-size:10px;opacity:0.55;margin-top:1px}
+.di-memo{font-size:10px;margin-top:2px;color:#8a5a00;background:#fff6e0;border-radius:3px;padding:1px 4px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dempty{font-size:11px;color:var(--text3);text-align:center;padding:16px 0}
 /* STACK */
 .stack-label{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:7px}
@@ -732,6 +733,7 @@ function buildDailyAll(){
           +'<div class="di-name'+(isDone?' strike':'')+'">'+escH(s.name)+'</div>'
           +'<div class="di-time">'+ft(s.startHour,s.startMin)+' ~ '+endT(s)+' · '+s.duration+'분</div>'
           +(s.region?'<div class="di-region">'+escH(s.region)+'</div>':'')
+          +(s.memo?'<div class="di-memo">📌 '+escH(s.memo)+'</div>':'')
           +'</div></div>';
       }).join('');
     return '<div class="dcard" data-tech="'+t.id+'" style="background:'+c.bg+'20"'
@@ -849,7 +851,9 @@ function showTip(e,id){
   const t=getTech(s.techId);
   const el=document.getElementById('tt');
   el.innerHTML='<strong>'+escH(s.name)+'</strong>'+(s.region?' · '+escH(s.region):'')+
-    '<br>'+(t?.name||'')+'<br>'+ft(s.startHour,s.startMin)+' ~ '+endT(s)+' ('+s.duration+'분)'+(s.done?'<br>✓ 완료':'');
+    '<br>'+(t?.name||'')+'<br>'+ft(s.startHour,s.startMin)+' ~ '+endT(s)+' ('+s.duration+'분)'+
+    (s.memo?'<br><span style="color:#ffd479">📌 '+escH(s.memo)+'</span>':'')+
+    (s.done?'<br>✓ 완료':'');
   el.style.display='block'; moveTip(e);
 }
 function moveTip(e){
@@ -877,6 +881,7 @@ function openAddSched(){
     +'<h3><i class="ti ti-calendar-plus" style="color:var(--primary)"></i> 스케줄 추가</h3>'
     +'<div class="form-row"><label>거래처명</label><input id="as-n" placeholder="예) 강남구 ABC마트"></div>'
     +'<div class="form-row"><label>지역</label><input id="as-r"></div>'
+    +'<div class="form-row"><label>메모 (출입방법·주의사항)</label><input id="as-m" placeholder="예) 비번 1234 / 전날 문자"></div>'
     +'<div class="form-row"><label>담당 기사</label><select id="as-t">'+opts+'</select></div>'
     +'<div class="form-row"><label>날짜</label><input type="date" id="as-d" value="'+ds(S.currentDate)+'"></div>'
     +'<div class="form-row"><label>시작 시간</label><input type="time" id="as-time" value="09:00"></div>'
@@ -892,6 +897,7 @@ async function saveAddSched(){
   const[h,m]=(document.getElementById('as-time').value||'09:00').split(':').map(Number);
   const s={id:uid(),techId:document.getElementById('as-t').value,name,
     region:document.getElementById('as-r').value.trim(),
+    memo:document.getElementById('as-m').value.trim(),
     date:document.getElementById('as-d').value,
     startHour:h,startMin:m,duration:parseInt(document.getElementById('as-dur').value)||60,done:false};
   S.schedules.push(s); closeModal(); render(); await fbSaveSchedule(s);
@@ -906,6 +912,7 @@ function openEditSched(id){
     +'<h3><i class="ti ti-edit" style="color:var(--primary)"></i> 스케줄 수정</h3>'
     +'<div class="form-row"><label>거래처명</label><input id="es-n" value="'+escH(s.name)+'"></div>'
     +'<div class="form-row"><label>지역</label><input id="es-r" value="'+escH(s.region||'')+'"></div>'
+    +'<div class="form-row"><label>메모 (출입방법·주의사항)</label><input id="es-m" value="'+escH(s.memo||'')+'"></div>'
     +(isAdmin()?'<div class="form-row"><label>담당 기사</label><select id="es-t">'+opts+'</select></div>'
       :'<input type="hidden" id="es-t" value="'+s.techId+'">')
     +'<div class="form-row"><label>날짜</label><input type="date" id="es-d" value="'+s.date+'"></div>'
@@ -923,6 +930,7 @@ async function saveEditSched(id){
   const[h,m]=(document.getElementById('es-time').value||'09:00').split(':').map(Number);
   const oldTechId=s.techId;
   const up={...s,name,region:document.getElementById('es-r').value.trim(),
+    memo:document.getElementById('es-m').value.trim(),
     techId:document.getElementById('es-t').value,date:document.getElementById('es-d').value,
     startHour:h,startMin:m,duration:parseInt(document.getElementById('es-dur').value)||60};
   S.schedules=S.schedules.map(x=>x.id===id?up:x);
@@ -1022,7 +1030,7 @@ async function execCopyMonth(){
 /* ── 업로드 ── */
 function openUpload(){
   if(!isAdmin()) return;
-  showModal('<div class="modal" onclick="event.stopPropagation()" style="width:420px"><h3><i class="ti ti-upload" style="color:var(--primary)"></i> 스케줄 업로드</h3><p style="font-size:12px;color:var(--text2);margin-bottom:10px">필수 컬럼: <span class="col-tag">기사명</span><span class="col-tag">거래처명</span><span class="col-tag">날짜</span><span class="col-tag">시작시간</span><span class="col-tag">소요시간</span><span class="col-tag">지역</span></p><div class="upload-zone" onclick="document.getElementById(\'ul-f\').click()"><i class="ti ti-cloud-upload"></i><p>클릭하여 파일 선택</p><small>.xlsx · .csv</small></div><input type="file" id="ul-f" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUpload(event)"><div class="upload-status" id="ul-st"></div><div class="form-actions"><button class="btn" onclick="closeModal()">닫기</button></div></div>');
+  showModal('<div class="modal" onclick="event.stopPropagation()" style="width:420px"><h3><i class="ti ti-upload" style="color:var(--primary)"></i> 스케줄 업로드</h3><p style="font-size:12px;color:var(--text2);margin-bottom:10px">컬럼: <span class="col-tag">기사명</span><span class="col-tag">거래처명</span><span class="col-tag">날짜</span><span class="col-tag">시작시간</span><span class="col-tag">소요시간</span><span class="col-tag">지역</span><span class="col-tag">메모</span></p><div class="upload-zone" onclick="document.getElementById(\'ul-f\').click()"><i class="ti ti-cloud-upload"></i><p>클릭하여 파일 선택</p><small>.xlsx · .csv</small></div><input type="file" id="ul-f" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUpload(event)"><div class="upload-status" id="ul-st"></div><div class="form-actions"><button class="btn" onclick="closeModal()">닫기</button></div></div>');
 }
 /* 엑셀의 날짜/시간 칸은 화면에 "2026-07-14"로 보여도 실제 값은 숫자(일련번호)다.
    그대로 저장하면 "46217" 같은 값이 들어가므로 반드시 변환해야 한다. */
@@ -1092,11 +1100,12 @@ async function handleUpload(e){
         const date=normDate(row['날짜']);
         const [h,m]=normTime(row['시작시간']);
         const dur=parseInt(row['소요시간'])||60, region=String(row['지역']??'').trim();
+        const memo=String(row['메모']??'').trim().slice(0,200);
         if(!name||!date){skipped++;continue;}
         let t=S.technicians.find(x=>x.name===tn);
         if(!t&&tn&&S.technicians.length<MAX_TECHS){t={id:tuid(),name:tn,colorId:S.technicians.length%PALETTE.length,defaultDuration:60};S.technicians.push(t);await fbSaveTech(t);}
         if(!t)t=S.technicians[0]; if(!t){skipped++;continue;}
-        const s={id:uid(),techId:t.id,name,region,date,startHour:h,startMin:m,duration:dur,done:false};
+        const s={id:uid(),techId:t.id,name,region,memo,date,startHour:h,startMin:m,duration:dur,done:false};
         S.schedules.push(s); await fbSaveSchedule(s); added++;
       }
       st.innerHTML='<span style="color:var(--green)">✓ '+added+'건 추가 ('+skipped+'건 건너뜀)</span>';
@@ -1113,16 +1122,16 @@ function exportExcel(){
   S.technicians.forEach(t=>{
     const rows=S.schedules.filter(s=>s.techId===t.id)
       .sort((a,b)=>a.date.localeCompare(b.date)||a.startHour*60+a.startMin-(b.startHour*60+b.startMin))
-      .map(s=>({'기사명':t.name,'날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간(분)':s.duration,'거래처명':s.name,'지역':s.region||'','완료':s.done?'완료':''}));
-    if(!rows.length) rows.push({'기사명':t.name,'날짜':'','시작시간':'','종료시간':'','소요시간(분)':'','거래처명':'(없음)','지역':'','완료':''});
+      .map(s=>({'기사명':t.name,'날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','완료':s.done?'완료':''}));
+    if(!rows.length) rows.push({'기사명':t.name,'날짜':'','시작시간':'','종료시간':'','소요시간':'','거래처명':'(없음)','지역':'','메모':'','완료':''});
     const ws=XLSX.utils.json_to_sheet(rows);
-    ws['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:12},{wch:26},{wch:12},{wch:6}];
+    ws['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6}];
     XLSX.utils.book_append_sheet(wb,ws,t.name.slice(0,28));
   });
   const allR=S.schedules.sort((a,b)=>a.date.localeCompare(b.date)||a.startHour*60+a.startMin-(b.startHour*60+b.startMin))
-    .map(s=>{const t=getTech(s.techId);return{'기사명':t?.name||'','날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간(분)':s.duration,'거래처명':s.name,'지역':s.region||'','완료':s.done?'완료':''};});
+    .map(s=>{const t=getTech(s.techId);return{'기사명':t?.name||'','날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','완료':s.done?'완료':''};});
   const wsa=XLSX.utils.json_to_sheet(allR.length?allR:[{}]);
-  wsa['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:12},{wch:26},{wch:12},{wch:6}];
+  wsa['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6}];
   XLSX.utils.book_append_sheet(wb,wsa,'전체통합');
   XLSX.writeFile(wb,'PABRE_스케줄_'+S.currentDate.getFullYear()+String(S.currentDate.getMonth()+1).padStart(2,'0')+'.xlsx');
 }

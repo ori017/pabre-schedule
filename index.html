@@ -19,7 +19,8 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-         updatePassword, EmailAuthProvider, reauthenticateWithCredential }
+         updatePassword, EmailAuthProvider, reauthenticateWithCredential,
+         setPersistence, browserLocalPersistence, browserSessionPersistence }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, update, remove, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -51,6 +52,8 @@ window._fbUpdate     = update;
 window._fbRemove     = remove;
 window._fbGet        = get;
 window._fbSignIn     = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
+// keep=true: 브라우저를 닫아도 로그인 유지 / false: 창을 닫으면 로그아웃
+window._fbPersist    = (keep) => setPersistence(auth, keep ? browserLocalPersistence : browserSessionPersistence);
 window._fbSignOut    = () => signOut(auth);
 window._fbOnAuth     = (cb) => onAuthStateChanged(auth, cb);
 window._fbUpdatePw   = (user, pw) => updatePassword(user, pw);
@@ -218,6 +221,9 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .login-logo .emoji{font-size:44px;display:block;margin-bottom:8px}
 .login-logo .title{font-size:22px;font-weight:700;color:var(--primary)}
 .login-logo .sub{font-size:12px;color:var(--text2);margin-top:3px}
+.login-opts{display:flex;gap:14px;margin:-2px 0 10px;font-size:12px;color:var(--text2)}
+.login-opts label{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.login-opts input[type=checkbox]{width:15px;height:15px;accent-color:var(--primary);cursor:pointer;margin:0}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 @media(max-width:768px){
@@ -430,9 +436,14 @@ async function doLogin(){
   const err=document.getElementById('li-err');
   err.textContent='';
   if(!email||!pw){err.textContent='이메일과 비밀번호를 입력하세요.';return;}
+  const saveId=document.getElementById('li-save').checked;
+  const keep  =document.getElementById('li-keep').checked;
   const btn=document.getElementById('li-btn');
   btn.disabled=true; btn.textContent='로그인 중...';
   try{
+    if(saveId) lsSet('pabre_email', email); else lsDel('pabre_email');
+    lsSet('pabre_keep', keep?'1':'0');
+    await window._fbPersist(keep);   // 로그인 유지 여부는 로그인 전에 정해야 한다
     await window._fbSignIn(email, pw);
   }catch(e){
     btn.disabled=false; btn.textContent='로그인';
@@ -455,7 +466,14 @@ async function doLogout(){
 /* ════════════════════════════════════════════
    RENDER
 ════════════════════════════════════════════ */
+/* 브라우저 설정에 따라 localStorage가 막혀 있을 수 있으므로 감싸서 쓴다 */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
 function renderLogin(){
+  const savedEmail = lsGet('pabre_email') || '';
+  const keepLogin  = lsGet('pabre_keep') !== '0';   // 기본값: 유지함
   document.getElementById('root').innerHTML=`
   <div class="login-wrap">
     <div class="login-box">
@@ -466,13 +484,17 @@ function renderLogin(){
       </div>
       <div class="form-row">
         <label>이메일</label>
-        <input id="li-email" type="email" placeholder="example@pabre.kr"
+        <input id="li-email" type="email" placeholder="example@pabre.kr" value="${escH(savedEmail)}"
           onkeydown="if(event.key==='Enter')document.getElementById('li-pw').focus()">
       </div>
       <div class="form-row">
         <label>비밀번호</label>
         <input id="li-pw" type="password" placeholder="비밀번호 입력"
           onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="login-opts">
+        <label><input type="checkbox" id="li-save" ${savedEmail?'checked':''}> 아이디 저장</label>
+        <label><input type="checkbox" id="li-keep" ${keepLogin?'checked':''}> 로그인 유지</label>
       </div>
       <div id="li-err" style="font-size:12px;color:#b91c1c;min-height:18px;margin-bottom:8px">${S.authError?escH(S.authError):''}</div>
       <button id="li-btn" class="btn primary" style="width:100%;padding:11px;font-size:14px;justify-content:center" onclick="doLogin()">
@@ -482,7 +504,11 @@ function renderLogin(){
     </div>
   </div>`;
   S.authError=null;
-  setTimeout(()=>document.getElementById('li-email')?.focus(),100);
+  setTimeout(()=>{
+    const em=document.getElementById('li-email');
+    // 아이디가 저장되어 있으면 비밀번호 칸부터 입력하도록
+    (savedEmail ? document.getElementById('li-pw') : em)?.focus();
+  },100);
 }
 
 function render(){

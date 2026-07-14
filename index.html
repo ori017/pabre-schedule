@@ -77,7 +77,9 @@ window.dispatchEvent(new Event('firebase-ready'));
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;font-size:13px;color:var(--text);background:var(--bg2);-webkit-tap-highlight-color:transparent}
 #root{height:100%;display:flex;flex-direction:column}
-.app{display:flex;flex-direction:column;height:100vh}
+/* 100vh는 모바일에서 주소창·하단바를 뺀 높이가 아니라 아래가 잘린다.
+   dvh(실제 보이는 높이)를 쓰고, 지원 안 하는 옛 브라우저는 100vh로 떨어진다. */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
 /* TOPBAR */
 .topbar{display:flex;align-items:center;gap:6px;padding:0 14px;height:52px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;padding-top:env(safe-area-inset-top)}
 .logo{font-size:15px;font-weight:700;color:var(--primary);letter-spacing:-0.5px;white-space:nowrap}
@@ -96,7 +98,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .tech-count{font-size:11px;color:var(--text3);padding:4px 10px;margin-left:auto;flex-shrink:0}
 /* 세로만 스크롤. 가로 스크롤은 달력(.month-wrap/.week-wrap)이 직접 처리한다.
    -webkit-overflow-scrolling은 넣지 않는다: 안쪽 가로 스크롤과 충돌해 아이폰에서 끝까지 안 밀린다 */
-.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.1s}
 .btn:hover{background:var(--bg2)}
@@ -222,6 +225,12 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .upload-zone:hover{border-color:var(--primary);background:var(--pl)}
 .upload-zone i{font-size:32px;display:block;margin-bottom:6px;opacity:0.35}
 .upload-status{margin-top:8px;font-size:12px;min-height:18px}
+/* 진행 표시 (업로드·월복사 공용) */
+.prog-box{margin-top:4px}
+.prog-txt{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.prog-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--primary);border-radius:3px;transition:width 0.15s}
+.modal button:disabled{opacity:0.45;cursor:not-allowed}
 .col-tag{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;font-family:monospace;display:inline-block;margin:2px}
 .tmgmt-list{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px}
 .tmgmt-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px}
@@ -236,7 +245,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .tt{position:fixed;background:#1c1c1c;color:#fff;border-radius:7px;padding:7px 10px;font-size:11px;z-index:1200;pointer-events:none;display:none;max-width:180px;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,0.25)}
 .tt strong{display:block;font-size:12px;margin-bottom:1px}
 /* LOGIN */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg2);padding:20px}
+.login-wrap{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--bg2);padding:20px;overflow-y:auto}
 .login-box{background:var(--bg);border-radius:16px;padding:32px;width:340px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.1)}
 .login-logo{text-align:center;margin-bottom:24px}
 .login-logo .emoji{font-size:44px;display:block;margin-bottom:8px}
@@ -561,8 +570,10 @@ function buildApp(){
     <button class="btn" onclick="openUpload()"><i class="ti ti-upload"></i> 업로드</button>
     <button class="btn" onclick="exportExcel()"><i class="ti ti-file-spreadsheet"></i> 엑셀</button>
     <button class="btn" onclick="exportMonthExcel()"><i class="ti ti-calendar-stats"></i> 월간엑셀</button>
+    <button class="btn" onclick="exportMonthImage()"><i class="ti ti-photo"></i> 이미지</button>
     <button class="btn" onclick="openAccountInfo()"><i class="ti ti-settings"></i></button>`
-    :`<button class="btn" onclick="openChangePw()"><i class="ti ti-key"></i> 비번변경</button>`;
+    :`<button class="btn" onclick="exportMonthImage()"><i class="ti ti-photo"></i> 이미지</button>
+      <button class="btn" onclick="openChangePw()"><i class="ti ti-key"></i> 비번변경</button>`;
 
   const techTabs=isAdmin()?`
     <div class="tech-strip">
@@ -926,7 +937,12 @@ async function toggleDone(id,e){
 /* ════════════════════════════════════════════
    TOOLTIP
 ════════════════════════════════════════════ */
+/* 터치 기기에는 '마우스가 벗어남'이 없어서 말풍선이 안 사라진다.
+   진짜 마우스가 있는 기기에서만 말풍선을 띄운다. */
+const CAN_HOVER = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+
 function showTip(e,id){
+  if(!CAN_HOVER) return;
   const s=S.schedules.find(x=>x.id===id); if(!s) return;
   const t=getTech(s.techId);
   const el=document.getElementById('tt');
@@ -940,8 +956,11 @@ function moveTip(e){
   const el=document.getElementById('tt'); if(el.style.display!=='block') return;
   el.style.left=(e.clientX+14)+'px'; el.style.top=(e.clientY-10)+'px';
 }
-function hideTip(){document.getElementById('tt').style.display='none';}
+function hideTip(){const el=document.getElementById('tt'); if(el) el.style.display='none';}
 document.addEventListener('mousemove',moveTip,{passive:true});
+// 혹시라도 떠 있으면 터치·스크롤 시 반드시 닫는다
+document.addEventListener('touchstart',hideTip,{passive:true});
+document.addEventListener('scroll',hideTip,{passive:true,capture:true});
 
 /* ════════════════════════════════════════════
    MODALS
@@ -1140,6 +1159,18 @@ function openCopyMonth(){
   }).join('');
   showModal('<div class="modal" onclick="event.stopPropagation()" style="width:400px"><h3><i class="ti ti-copy" style="color:var(--primary)"></i> 월 단위 복사</h3><div class="form-row"><label>원본 월</label><select id="cp-s">'+mopts+'</select></div><div class="form-row"><label>대상 월</label><select id="cp-d">'+mopts+'</select></div><div class="form-row"><label>대상 기사(비우면 전체)</label><select id="cp-t"><option value="">전체</option>'+techopts+'</select></div><div class="form-row"><label><input type="checkbox" id="cp-ow" style="width:auto;margin-right:6px"> 대상 월 기존 일정 덮어쓰기</label></div><div id="cp-st" style="font-size:12px;min-height:18px"></div><div class="form-actions"><button class="btn" onclick="closeModal()">취소</button><button class="btn primary" onclick="execCopyMonth()"><i class="ti ti-copy"></i> 복사 실행</button></div></div>');
 }
+/* 진행 상황을 보여주는 막대 (복사·업로드 공용) */
+function progHTML(done,total,label){
+  const pct=total?Math.round(done/total*100):0;
+  return '<div class="prog-box"><div class="prog-txt">'
+    +'<i class="ti ti-refresh" style="animation:spin 1s linear infinite"></i> '
+    +escH(label)+' '+done+' / '+total+' ('+pct+'%)</div>'
+    +'<div class="prog-bar"><div class="prog-fill" style="width:'+pct+'%"></div></div></div>';
+}
+function setBusy(busy){
+  document.querySelectorAll('.modal button').forEach(b=>b.disabled=busy);
+}
+
 async function execCopyMonth(){
   const sv=document.getElementById('cp-s').value, dv=document.getElementById('cp-d').value;
   const ft2=document.getElementById('cp-t').value, ow=document.getElementById('cp-ow').checked;
@@ -1149,23 +1180,34 @@ async function execCopyMonth(){
   if(ft2) srcs=srcs.filter(s=>s.techId===ft2);
   if(!srcs.length){st.innerHTML='<span style="color:#b91c1c">복사할 스케줄이 없습니다.</span>';return;}
   const[dy,dm]=dv.split('-').map(Number);
-  if(ow){
-    let rm=S.schedules.filter(s=>s.date.startsWith(dv));
-    if(ft2) rm=rm.filter(s=>s.techId===ft2);
-    for(const s of rm) await fbDeleteSchedule(s);
-    S.schedules=S.schedules.filter(s=>!rm.find(r=>r.id===s.id));
+
+  setBusy(true);
+  try{
+    if(ow){
+      let rm=S.schedules.filter(s=>s.date.startsWith(dv));
+      if(ft2) rm=rm.filter(s=>s.techId===ft2);
+      for(let i=0;i<rm.length;i++){
+        st.innerHTML=progHTML(i,rm.length,'기존 일정 삭제 중');
+        await fbDeleteSchedule(rm[i]);
+      }
+      S.schedules=S.schedules.filter(s=>!rm.find(r=>r.id===s.id));
+    }
+    let copied=0;
+    for(let i=0;i<srcs.length;i++){
+      const src=srcs[i];
+      st.innerHTML=progHTML(i,srcs.length,'복사 중');
+      const sd=parseDs(src.date), dow=sd.getDay(), wom=Math.floor((sd.getDate()-1)/7);
+      const dstLast=new Date(dy,dm,0).getDate();
+      const cands=[]; for(let d=1;d<=dstLast;d++){if(new Date(dy,dm-1,d).getDay()===dow) cands.push(d);}
+      const dDay=cands[wom]??cands[cands.length-1]; if(!dDay) continue;
+      const dStr=dy+'-'+String(dm).padStart(2,'0')+'-'+String(dDay).padStart(2,'0');
+      const ns={...src,id:uid(),date:dStr,done:false};
+      S.schedules.push(ns); await fbSaveSchedule(ns); copied++;
+    }
+    st.innerHTML='<span style="color:var(--green)">✓ '+copied+'건 복사 완료</span>';
+  } finally {
+    setBusy(false);
   }
-  let copied=0;
-  for(const src of srcs){
-    const sd=parseDs(src.date), dow=sd.getDay(), wom=Math.floor((sd.getDate()-1)/7);
-    const dstLast=new Date(dy,dm,0).getDate();
-    const cands=[]; for(let d=1;d<=dstLast;d++){if(new Date(dy,dm-1,d).getDay()===dow) cands.push(d);}
-    const dDay=cands[wom]??cands[cands.length-1]; if(!dDay) continue;
-    const dStr=dy+'-'+String(dm).padStart(2,'0')+'-'+String(dDay).padStart(2,'0');
-    const ns={...src,id:uid(),date:dStr,done:false};
-    S.schedules.push(ns); await fbSaveSchedule(ns); copied++;
-  }
-  st.innerHTML='<span style="color:var(--green)">✓ '+copied+'건 복사 완료</span>';
   render();
 }
 
@@ -1237,7 +1279,10 @@ async function handleUpload(e){
         rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
       }
       let added=0,skipped=0;
-      for(const row of rows){
+      setBusy(true);
+      for(let i=0;i<rows.length;i++){
+        const row=rows[i];
+        if(i%3===0 || i===rows.length-1) st.innerHTML=progHTML(i,rows.length,'업로드 중');
         const tn=String(row['기사명']??'').trim(), name=String(row['거래처명']??'').trim();
         const date=normDate(row['날짜']);
         const [h,m]=normTime(row['시작시간']);
@@ -1250,9 +1295,10 @@ async function handleUpload(e){
         const s={id:uid(),techId:t.id,name,region,memo,date,startHour:h,startMin:m,duration:dur,done:false};
         S.schedules.push(s); await fbSaveSchedule(s); added++;
       }
+      setBusy(false);
       st.innerHTML='<span style="color:var(--green)">✓ '+added+'건 추가 ('+skipped+'건 건너뜀)</span>';
       render();
-    }catch(err){st.innerHTML='<span style="color:#b91c1c">오류: '+err.message+'</span>';}
+    }catch(err){setBusy(false);st.innerHTML='<span style="color:#b91c1c">오류: '+err.message+'</span>';}
   };
   file.name.toLowerCase().endsWith('.csv')?reader.readAsText(file,'UTF-8'):reader.readAsArrayBuffer(file);
   e.target.value='';
@@ -1307,6 +1353,98 @@ function exportMonthExcel(){
   tl.forEach(t=>{const ws=buildSheet(mStr+' - '+t.name,dStr=>schedsFor(t.id,dStr));XLSX.utils.book_append_sheet(wb,ws,(t.name+'_월간').slice(0,31));});
   if(!S.activeTechId&&tl.length>1){const ws2=buildSheet(mStr+' 전체',dStr=>allSchedsFor(dStr).map(s=>({...s,_tn:getTech(s.techId)?.name||''})));ws2['!cols']=Array(7).fill({wch:26});XLSX.utils.book_append_sheet(wb,ws2,'전체_월간');}
   XLSX.writeFile(wb,'PABRE_월간달력_'+y+String(m+1).padStart(2,'0')+'.xlsx');
+}
+
+/* ── 월간 달력 이미지(PNG) 저장 ── */
+function fitTxt(x,s,maxW){
+  if(x.measureText(s).width<=maxW) return s;
+  let t=s;
+  while(t.length>1 && x.measureText(t+'…').width>maxW) t=t.slice(0,-1);
+  return t+'…';
+}
+function exportMonthImage(){
+  const y=S.currentDate.getFullYear(), m=S.currentDate.getMonth();
+  const first=new Date(y,m,1), last=new Date(y,m+1,0), pad=first.getDay();
+  const rows=Math.ceil((pad+last.getDate())/7);
+  const tech=S.activeTechId?getTech(S.activeTechId):null;
+
+  const byDay=[]; let maxItems=1;
+  for(let d=1;d<=last.getDate();d++){
+    const dStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const sc=(S.activeTechId?schedsFor(S.activeTechId,dStr):allSchedsFor(dStr))
+      .slice().sort((a,b)=>a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
+    byDay[d]=sc; if(sc.length>maxItems) maxItems=sc.length;
+  }
+
+  const PAD=28, CW=200, LINE=19, TITLE=62, DOWH=34;
+  const CH=Math.max(96, 28+maxItems*LINE+10);
+  const W=PAD*2+CW*7, H=PAD*2+TITLE+DOWH+CH*rows;
+  const SC=2;
+  const cv=document.createElement('canvas');
+  cv.width=W*SC; cv.height=H*SC;
+  const x=cv.getContext('2d');
+  x.scale(SC,SC); x.textBaseline='top';
+  const F='-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR","Malgun Gothic",sans-serif';
+
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  x.fillStyle='#1c1c1c'; x.font='700 24px '+F;
+  x.fillText(y+'년 '+(m+1)+'월 소독 스케줄  ·  '+(tech?tech.name:'전체'), PAD, PAD+4);
+  x.fillStyle='#aaa'; x.font='13px '+F;
+  const brand='PABRE';
+  x.fillText(brand, W-PAD-x.measureText(brand).width, PAD+12);
+
+  const top0=PAD+TITLE;
+  for(let c=0;c<7;c++){
+    const cx=PAD+c*CW;
+    x.fillStyle='#f7f6f3'; x.fillRect(cx,top0,CW,DOWH);
+    x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,top0+0.5,CW,DOWH);
+    x.fillStyle=(c===0?'#d4537e':(c===6?'#378add':'#666'));
+    x.font='600 14px '+F;
+    const tw=x.measureText(DAYS_KO[c]).width;
+    x.fillText(DAYS_KO[c], cx+CW/2-tw/2, top0+9);
+  }
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<7;c++){
+      const day=r*7+c-pad+1;
+      const cx=PAD+c*CW, cy=top0+DOWH+r*CH;
+      const inM=day>=1&&day<=last.getDate();
+      x.fillStyle=inM?'#fff':'#faf9f7'; x.fillRect(cx,cy,CW,CH);
+      x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,cy+0.5,CW,CH);
+      if(!inM) continue;
+
+      x.fillStyle=(c===0?'#d4537e':(c===6?'#378add':'#444'));
+      x.font='700 13px '+F;
+      x.fillText(String(day), cx+9, cy+7);
+
+      const sc=byDay[day]||[];
+      for(let i=0;i<sc.length;i++){
+        const s=sc[i], t2=getTech(s.techId), col=clr(t2?t2.colorId:0);
+        const ly=cy+26+i*LINE;
+        if(s.kind==='leave'){
+          x.fillStyle='#F5E4C8'; x.fillRect(cx+6,ly,CW-12,LINE-3);
+          x.fillStyle='#7a5a10'; x.font='700 11px '+F;
+          x.fillText(fitTxt(x,'연차 '+(s.name==='연차'?'':s.name),CW-20), cx+11, ly+2);
+          continue;
+        }
+        x.fillStyle=col.bg;  x.fillRect(cx+6,ly,CW-12,LINE-3);
+        x.fillStyle=col.dot; x.fillRect(cx+6,ly,3,LINE-3);
+        x.fillStyle=col.text; x.font='11px '+F;
+        let label=ft(s.startHour,s.startMin)+' '+(S.activeTechId?'':'['+(t2?t2.name:'')+'] ')+s.name;
+        if(s.done) label='✓ '+label;
+        x.fillText(fitTxt(x,label,CW-22), cx+13, ly+2);
+      }
+    }
+  }
+
+  cv.toBlob(function(blob){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='PABRE_월간달력_'+y+String(m+1).padStart(2,'0')+(tech?'_'+tech.name:'')+'.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  },'image/png');
 }
 
 /* ── 계정 정보 (관리자) ── */

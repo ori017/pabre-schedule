@@ -160,8 +160,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .month-wrap{display:flex;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
   margin:0 -16px;padding:0 0 8px 16px}
 .month-wrap::after{content:'';flex:0 0 16px}   /* 오른쪽 끝 여백 (스크롤 범위에 포함됨) */
-/* min-width 덕분에 좁은 화면에서는 가로 스크롤이 생기고, 넓은 화면에서는 꽉 채운다 */
-.month-grid{display:grid;flex:1 0 auto;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;gap:1px;background:var(--border);min-width:680px}
+/* 일·토는 근무일이 아니므로 좁게. min-width 덕분에 좁은 화면에서는 가로 스크롤이 생긴다 */
+.month-grid{display:grid;flex:1 0 auto;grid-template-columns:0.45fr repeat(5,1fr) 0.45fr;border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;gap:1px;background:var(--border);min-width:820px}
 .month-dow{background:var(--bg2);padding:7px 4px;text-align:center;font-size:11px;font-weight:500;color:var(--text2)}
 .month-cell{background:var(--bg);min-height:80px;padding:4px;display:flex;flex-direction:column;gap:2px;transition:background 0.1s}
 .month-cell.other-month{background:var(--bg2)}
@@ -174,9 +174,11 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .month-cell:hover .mday-handle{opacity:1}
 .mday-handle:hover{background:var(--bg3)}
 .mday-cnt{font-size:10px;color:var(--text3);background:var(--bg3);padding:0 4px;border-radius:8px}
-.mchip{border-radius:4px;padding:2px 4px;font-size:10px;font-weight:500;cursor:grab;margin-bottom:2px;line-height:1.35;display:flex;align-items:center;gap:3px;white-space:nowrap;width:100%;overflow:hidden}
+.mchip{border-radius:4px;padding:3px 5px;font-size:10px;font-weight:500;cursor:pointer;margin-bottom:3px;line-height:1.3;display:block;width:100%;overflow:hidden}
+.mc-top{display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden}
+.mc-sub{font-size:9px;opacity:0.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .mchip.done{opacity:0.4;filter:saturate(0.3)}
-.mchip.leave{background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 6px,#F5E4C8 6px,#F5E4C8 12px);color:#7a5a10;font-weight:700;justify-content:center;cursor:pointer}
+.mchip.leave{background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 6px,#F5E4C8 6px,#F5E4C8 12px);color:#7a5a10;font-weight:700;text-align:center;cursor:pointer}
 .mchip.is-dragging{opacity:0.3}
 .mchip-chk{width:11px;height:11px;border-radius:2px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;min-width:11px;transition:background 0.1s}
 .mchip-chk.checked{background:currentColor}
@@ -775,15 +777,19 @@ function buildMonth(){
           +' onclick="'+(canEdit?'openEditSched(\''+s.id+'\')':'')+'">'
           +'🏖️ '+escH(s.name||'연차')+(S.activeTechId?'':' · '+escH(t2?.name||''))+'</div>';
       }
+      // 지역·메모를 마우스 없이도 바로 볼 수 있도록 둘째 줄에 표시한다
+      const sub=[s.region||'', s.memo?('📌 '+s.memo):''].filter(Boolean).join(' · ');
       return '<div class="mchip'+(done?' done':'')+'"'
         +' style="background:'+c.bg+';color:'+c.text+'"'
         +' data-id="'+s.id+'"'
         +' draggable="'+canEdit+'"'
-        +' onmouseenter="showTip(event,\''+s.id+'\')" onmouseleave="hideTip()"'
+        +' onclick="'+(canEdit?'openEditSched(\''+s.id+'\')':'')+'"'
         +' ondragstart="onDragStart(event,\''+s.id+'\')" ondragend="onDragEnd()">'
-        +'<span class="mchip-chk'+(done?' checked':'')+'" onclick="toggleDone(\''+s.id+'\',event)"></span>'
+        +'<div class="mc-top">'
         +'<span class="mchip-time">'+ft(s.startHour,s.startMin)+'</span>'
-        +'<span class="mchip-name'+(done?' strike':'')+'" onclick="'+(canEdit?'openEditSched(\''+s.id+'\')':'')+'">'+ escH(s.name)+'</span>'
+        +'<span class="mchip-name'+(done?' strike':'')+'">'+escH(s.name)+'</span>'
+        +'</div>'
+        +(sub?'<div class="mc-sub">'+escH(sub)+'</div>':'')
         +'</div>';
     }).join('');
     const handleHtml=isAdmin()
@@ -1376,9 +1382,15 @@ function exportMonthImage(){
     byDay[d]=sc; if(sc.length>maxItems) maxItems=sc.length;
   }
 
-  const PAD=28, CW=200, LINE=19, TITLE=62, DOWH=34;
-  const CH=Math.max(96, 28+maxItems*LINE+10);
-  const W=PAD*2+CW*7, H=PAD*2+TITLE+DOWH+CH*rows;
+  // 토·일은 근무일이 아니므로 좁게 그린다
+  const WD=240, WE=110;
+  const COLW=[WE,WD,WD,WD,WD,WD,WE];
+  const COLX=[]; let acc=0;
+  for(let c=0;c<7;c++){ COLX[c]=acc; acc+=COLW[c]; }
+
+  const PAD=28, ITEM=32, TITLE=62, DOWH=34;
+  const CH=Math.max(100, 28+maxItems*ITEM+10);
+  const W=PAD*2+acc, H=PAD*2+TITLE+DOWH+CH*rows;
   const SC=2;
   const cv=document.createElement('canvas');
   cv.width=W*SC; cv.height=H*SC;
@@ -1395,22 +1407,24 @@ function exportMonthImage(){
 
   const top0=PAD+TITLE;
   for(let c=0;c<7;c++){
-    const cx=PAD+c*CW;
-    x.fillStyle='#f7f6f3'; x.fillRect(cx,top0,CW,DOWH);
-    x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,top0+0.5,CW,DOWH);
+    const cx=PAD+COLX[c], cw=COLW[c];
+    x.fillStyle='#f7f6f3'; x.fillRect(cx,top0,cw,DOWH);
+    x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,top0+0.5,cw,DOWH);
     x.fillStyle=(c===0?'#d4537e':(c===6?'#378add':'#666'));
     x.font='600 14px '+F;
     const tw=x.measureText(DAYS_KO[c]).width;
-    x.fillText(DAYS_KO[c], cx+CW/2-tw/2, top0+9);
+    x.fillText(DAYS_KO[c], cx+cw/2-tw/2, top0+9);
   }
 
   for(let r=0;r<rows;r++){
     for(let c=0;c<7;c++){
       const day=r*7+c-pad+1;
-      const cx=PAD+c*CW, cy=top0+DOWH+r*CH;
+      const cx=PAD+COLX[c], cw=COLW[c], cy=top0+DOWH+r*CH;
       const inM=day>=1&&day<=last.getDate();
-      x.fillStyle=inM?'#fff':'#faf9f7'; x.fillRect(cx,cy,CW,CH);
-      x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,cy+0.5,CW,CH);
+      const weekend=(c===0||c===6);
+      x.fillStyle=inM?(weekend?'#fbfaf8':'#fff'):'#f4f2ef';
+      x.fillRect(cx,cy,cw,CH);
+      x.strokeStyle='#e2dfd8'; x.lineWidth=1; x.strokeRect(cx+0.5,cy+0.5,cw,CH);
       if(!inM) continue;
 
       x.fillStyle=(c===0?'#d4537e':(c===6?'#378add':'#444'));
@@ -1420,19 +1434,31 @@ function exportMonthImage(){
       const sc=byDay[day]||[];
       for(let i=0;i<sc.length;i++){
         const s=sc[i], t2=getTech(s.techId), col=clr(t2?t2.colorId:0);
-        const ly=cy+26+i*LINE;
+        const ly=cy+26+i*ITEM;
+        const bw=cw-12;
         if(s.kind==='leave'){
-          x.fillStyle='#F5E4C8'; x.fillRect(cx+6,ly,CW-12,LINE-3);
+          x.fillStyle='#F5E4C8'; x.fillRect(cx+6,ly,bw,ITEM-4);
           x.fillStyle='#7a5a10'; x.font='700 11px '+F;
-          x.fillText(fitTxt(x,'연차 '+(s.name==='연차'?'':s.name),CW-20), cx+11, ly+2);
+          x.fillText(fitTxt(x,'🏖 연차',bw-10), cx+11, ly+7);
           continue;
         }
-        x.fillStyle=col.bg;  x.fillRect(cx+6,ly,CW-12,LINE-3);
-        x.fillStyle=col.dot; x.fillRect(cx+6,ly,3,LINE-3);
-        x.fillStyle=col.text; x.font='11px '+F;
+        x.fillStyle=col.bg;  x.fillRect(cx+6,ly,bw,ITEM-4);
+        x.fillStyle=col.dot; x.fillRect(cx+6,ly,3,ITEM-4);
+
+        // 첫 줄: 시간 + 거래처명
+        x.fillStyle=col.text; x.font='600 11px '+F;
         let label=ft(s.startHour,s.startMin)+' '+(S.activeTechId?'':'['+(t2?t2.name:'')+'] ')+s.name;
         if(s.done) label='✓ '+label;
-        x.fillText(fitTxt(x,label,CW-22), cx+13, ly+2);
+        x.fillText(fitTxt(x,label,bw-14), cx+13, ly+2);
+
+        // 둘째 줄: 지역 · 메모
+        const sub=[s.region||'', s.memo?('📌 '+s.memo):''].filter(Boolean).join(' · ');
+        if(sub){
+          x.font='9px '+F;
+          x.globalAlpha=0.72;
+          x.fillText(fitTxt(x,sub,bw-14), cx+13, ly+16);
+          x.globalAlpha=1;
+        }
       }
     }
   }

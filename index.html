@@ -94,7 +94,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .tab-add-btn{padding:6px 10px;cursor:pointer;color:var(--text3);font-size:18px;flex-shrink:0}
 .tab-add-btn:hover{color:var(--primary)}
 .tech-count{font-size:11px;color:var(--text3);padding:4px 10px;margin-left:auto;flex-shrink:0}
-.main{flex:1;overflow:auto;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+/* 세로만 스크롤. 가로 스크롤은 달력(.month-wrap/.week-wrap)이 직접 처리한다 */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.1s}
 .btn:hover{background:var(--bg2)}
@@ -113,7 +114,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .nav-btn{padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);cursor:pointer;font-size:12px;color:var(--text2)}
 .date-label{font-size:12px;font-weight:500;min-width:130px;text-align:center;white-space:nowrap}
 /* WEEK */
-.week-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* 좌우 여백만큼 음수 마진을 줘서 화면 끝까지 스크롤되게 한다 (모바일에서 마지막 칸이 잘리는 문제 방지) */
+.week-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;margin:0 -16px;padding:0 16px 8px}
 .week-grid{display:grid;border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;background:var(--border);gap:1px;min-width:480px}
 .wg-cell{background:var(--bg)}
 .wg-corner{background:var(--bg2);padding:6px 4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)}
@@ -138,9 +140,18 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .wg-block .bname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wg-block .bname.strike{text-decoration:line-through}
 .wg-block .btime{font-size:10px;opacity:0.75}
+/* 겹쳐서 반으로 나뉜 블록은 글자를 줄여 최대한 보이게 */
+.wg-block.narrow{padding:2px 3px;font-size:10px}
+.wg-block.narrow .btime{font-size:9px}
+/* 연차: 하루 전체를 덮는 배경 띠 (일반 일정보다 뒤에 깔림) */
+.wg-leave{position:absolute;left:2px;right:2px;top:0;z-index:2;border-radius:6px;cursor:pointer;
+  background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 8px,#F5E4C8 8px,#F5E4C8 16px);
+  border:1px solid #EAB87A;display:flex;align-items:flex-start;justify-content:center;padding-top:6px}
+.wg-leave span{font-size:11px;font-weight:600;color:#7a5a10;background:#fff;border-radius:10px;padding:1px 8px}
 /* MONTH */
-.month-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.month-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;gap:1px;background:var(--border);min-width:420px}
+.month-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;margin:0 -16px;padding:0 16px 8px}
+/* min-width 덕분에 좁은 화면에서는 가로 스크롤이 생기고, 넓은 화면에서는 꽉 채운다 */
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;gap:1px;background:var(--border);min-width:680px}
 .month-dow{background:var(--bg2);padding:7px 4px;text-align:center;font-size:11px;font-weight:500;color:var(--text2)}
 .month-cell{background:var(--bg);min-height:80px;padding:4px;display:flex;flex-direction:column;gap:2px;transition:background 0.1s}
 .month-cell.other-month{background:var(--bg2)}
@@ -155,6 +166,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .mday-cnt{font-size:10px;color:var(--text3);background:var(--bg3);padding:0 4px;border-radius:8px}
 .mchip{border-radius:4px;padding:2px 4px;font-size:10px;font-weight:500;cursor:grab;margin-bottom:2px;line-height:1.35;display:flex;align-items:center;gap:3px;white-space:nowrap;width:100%;overflow:hidden}
 .mchip.done{opacity:0.4;filter:saturate(0.3)}
+.mchip.leave{background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 6px,#F5E4C8 6px,#F5E4C8 12px);color:#7a5a10;font-weight:700;justify-content:center;cursor:pointer}
 .mchip.is-dragging{opacity:0.3}
 .mchip-chk{width:11px;height:11px;border-radius:2px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;min-width:11px;transition:background 0.1s}
 .mchip-chk.checked{background:currentColor}
@@ -173,6 +185,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .dcard-body{padding:6px}
 .ditem{border-radius:6px;padding:5px 7px;margin-bottom:4px;display:flex;align-items:flex-start;gap:6px;transition:opacity 0.1s}
 .ditem.done{opacity:0.4;filter:saturate(0.3)}
+.ditem.leave{background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 6px,#F5E4C8 6px,#F5E4C8 12px);color:#7a5a10;justify-content:center;cursor:pointer;padding:7px}
 .ditem-check{width:16px;height:16px;border-radius:4px;border:2px solid #aaa;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;margin-top:1px;transition:all 0.12s}
 .ditem-check.checked{background:var(--primary);border-color:var(--primary)}
 .ditem-check.checked::after{content:"\2713";font-size:10px;color:#fff;font-weight:700;line-height:1}
@@ -535,6 +548,7 @@ function buildApp(){
 
   const adminBtns=isAdmin()?`
     <button class="btn primary" onclick="openAddSched()"><i class="ti ti-plus"></i> 추가</button>
+    <button class="btn" onclick="openAddLeave()"><i class="ti ti-calendar-off"></i> 연차</button>
     <button class="btn" onclick="openTechMgmt()"><i class="ti ti-users"></i> 기사</button>
     <button class="btn" onclick="openCopyMonth()"><i class="ti ti-copy"></i> 월복사</button>
     <button class="btn" onclick="openUpload()"><i class="ti ti-upload"></i> 업로드</button>
@@ -604,7 +618,36 @@ function buildMain(){
 }
 
 /* ── 주간 뷰 ── */
-function buildWeekBlock(s, c, SLOT_H, MINI_H, canEdit) {
+/* \uc2dc\uac04\uc774 \uacb9\uce58\ub294 \uc77c\uc815\ub07c\ub9ac \ubb36\uc5b4\uc11c, \uac01\uc790 \uba87 \ubc88\uc9f8 \uce78\uc5d0 \uba87 \ub4f1\ubd84\uc73c\ub85c \ub193\uc77c\uc9c0 \uacc4\uc0b0\ud55c\ub2e4.
+   \uacb9\uce58\uc9c0 \uc54a\ub294 \uc77c\uc815\uc740 \ud63c\uc790 \uc804\uccb4 \ud3ed\uc744 \uc4f4\ub2e4. */
+function layoutDay(scheds){
+  var arr = scheds.slice().sort(function(a,b){
+    return (a.startHour*60+a.startMin)-(b.startHour*60+b.startMin) || (a.duration-b.duration);
+  });
+  var pos={}, grp=[], end=-1;
+  function flush(){
+    for(var i=0;i<grp.length;i++) pos[grp[i].id]={idx:i,cnt:grp.length};
+    grp=[];
+  }
+  for(var k=0;k<arr.length;k++){
+    var s=arr[k], st=s.startHour*60+s.startMin, en=st+(s.duration||60);
+    if(grp.length && st>=end){ flush(); end=en; }
+    else end=Math.max(end,en);
+    grp.push(s);
+  }
+  flush();
+  return pos;
+}
+
+/* \uc5f0\ucc28\ub294 \ud558\ub8e8 \uc804\uccb4\ub97c \ub36e\ub294 \ub760\ub85c \uadf8\ub9b0\ub2e4 (\uc77c\ubc18 \uc77c\uc815\ubcf4\ub2e4 \ub4a4\uc5d0 \uae54\ub9bc) */
+function buildLeaveBlock(s, SLOT_H, canEdit){
+  var ht  = HOURS.length*SLOT_H;
+  var clk = canEdit ? ' onclick="openEditSched(\''+s.id+'\')"' : '';
+  return '<div class="wg-leave" style="height:'+ht+'px" data-id="'+s.id+'"'+clk+'>'
+    +'<span>\ud83c\udfd6\ufe0f '+escH(s.name||'\uc5f0\ucc28')+'</span></div>';
+}
+
+function buildWeekBlock(s, c, SLOT_H, MINI_H, canEdit, lay) {
   var tp   = (s.startMin/60)*SLOT_H;
   var ht   = Math.max(MINI_H, (s.duration/60)*SLOT_H);
   var done = !!s.done;
@@ -614,8 +657,12 @@ function buildWeekBlock(s, c, SLOT_H, MINI_H, canEdit) {
     ? ' draggable="true" ondragstart="onDragStart(event,\''+s.id+'\')" ondragend="onDragEnd()"'
     : '';
   var clk  = canEdit ? ' onclick="openEditSched(\''+s.id+'\')"' : '';
-  return '<div class="wg-block'+(done?' done':'')+'"'
-    +' style="top:'+tp+'px;height:'+ht+'px;background:'+c.bg+';color:'+c.text+';border:1px solid '+c.border+'"'
+  var cnt  = (lay && lay.cnt) ? lay.cnt : 1;
+  var idx  = (lay && lay.idx) ? lay.idx : 0;
+  var w    = 100/cnt;
+  var side = 'left:calc('+(idx*w)+'% + 2px);width:calc('+w+'% - 4px);right:auto;';
+  return '<div class="wg-block'+(done?' done':'')+(cnt>1?' narrow':'')+'"'
+    +' style="'+side+'top:'+tp+'px;height:'+ht+'px;background:'+c.bg+';color:'+c.text+';border:1px solid '+c.border+'"'
     +' data-id="'+s.id+'"'+drag+clk
     +' onmouseenter="showTip(event,\''+s.id+'\')" onmouseleave="hideTip()">'
     +'<div class="bname'+(done?' strike':'')+'">' +nm+ '</div>'
@@ -645,13 +692,25 @@ function buildWeek(techId){
 
   var corner = '<div class="wg-cell wg-corner"><i class="ti ti-clock" style="font-size:12px"></i></div>';
 
+  /* 하루치 일정을 미리 나눠둔다: 연차는 배경 띠, 나머지는 겹침 계산 대상 */
+  var work={}, leave={}, lay={};
+  for(var dz=0;dz<days.length;dz++){
+    var dk=ds(days[dz]), all=schedsFor(techId,dk);
+    leave[dk]=all.filter(function(s){return s.kind==='leave';});
+    work[dk] =all.filter(function(s){return s.kind!=='leave';});
+    lay[dk]  =layoutDay(work[dk]);
+  }
+
   var dayHdrs = '';
   for(var di=0;di<days.length;di++){
     var d=days[di], dds=ds(d), isT=dds===tds;
-    var sc=schedsFor(techId,dds), dn=sc.filter(function(s){return s.done;}).length;
+    var sc=work[dds], dn=sc.filter(function(s){return s.done;}).length;
+    var badge = leave[dds].length
+      ? '<span style="font-size:10px;color:#7a6a2a;font-weight:600">🏖️ 연차</span>'
+      : (sc.length?'<span style="color:'+c.dot+';font-size:10px;font-weight:600">'+dn+'/'+sc.length+'</span>':'');
     dayHdrs += '<div class="wg-cell wg-dayhdr'+(isT?' is-today':'')+'"><div class="dow">'+DAYS_KO[d.getDay()]+'</div>'
       +'<div class="dnum">'+(d.getMonth()+1)+'/'+d.getDate()+'</div>'
-      +'<div class="dcnt">'+(sc.length?'<span style="color:'+c.dot+';font-size:10px;font-weight:600">'+dn+'/'+sc.length+'</span>':'')+'</div></div>';
+      +'<div class="dcnt">'+badge+'</div></div>';
   }
 
   var rows = '';
@@ -661,9 +720,13 @@ function buildWeek(techId){
     var cols='';
     for(var di2=0;di2<days.length;di2++){
       var d2=days[di2], dds2=ds(d2);
-      var sc2=schedsFor(techId,dds2).filter(function(s){return s.startHour===h;});
       var blocks='';
-      for(var si=0;si<sc2.length;si++) blocks+=buildWeekBlock(sc2[si],c,SLOT_H,MINI_H,canEdit);
+      // 연차 띠는 첫 시간대 칸에서 시작해 하루 전체 높이를 덮는다
+      if(hi===0){
+        for(var li=0;li<leave[dds2].length;li++) blocks+=buildLeaveBlock(leave[dds2][li],SLOT_H,canEdit);
+      }
+      var sc2=work[dds2].filter(function(s){return s.startHour===h;});
+      for(var si=0;si<sc2.length;si++) blocks+=buildWeekBlock(sc2[si],c,SLOT_H,MINI_H,canEdit,lay[dds2][sc2[si].id]);
       var minis=canEdit?buildWeekMinis(techId,dds2,h,MINI_H):'';
       cols+='<div class="wg-cell wg-col"><div class="wg-slot" style="position:relative">'+minis+blocks+'</div></div>';
     }
@@ -689,6 +752,11 @@ function buildMonth(){
     const chips=scheds.map(s=>{
       const t2=getTech(s.techId); const c=clr(t2?.colorId??0); const done=!!s.done;
       const canEdit=isAdmin()||(S.userTechId===s.techId);
+      if(s.kind==='leave'){
+        return '<div class="mchip leave" data-id="'+s.id+'"'
+          +' onclick="'+(canEdit?'openEditSched(\''+s.id+'\')':'')+'">'
+          +'🏖️ '+escH(s.name||'연차')+(S.activeTechId?'':' · '+escH(t2?.name||''))+'</div>';
+      }
       return '<div class="mchip'+(done?' done':'')+'"'
         +' style="background:'+c.bg+';color:'+c.text+'"'
         +' data-id="'+s.id+'"'
@@ -718,11 +786,16 @@ function buildDailyAll(){
   if(!techs.length) return '<div class="no-data"><i class="ti ti-calendar-off"></i><p>일정이 없습니다.</p></div>';
   return '<div class="daily-grid">'+techs.map(t=>{
     const c=clr(t.colorId); const sc=schedsFor(t.id,dStr);
-    const done=sc.filter(s=>s.done).length; const pct=sc.length?Math.round(done/sc.length*100):0;
+    const wk=sc.filter(s=>s.kind!=='leave');   // 연차는 일감 수에서 제외
+    const done=wk.filter(s=>s.done).length; const pct=wk.length?Math.round(done/wk.length*100):0;
     const canEdit=isAdmin()||(S.userTechId===t.id);
     const items=sc.length===0?'<div class="dempty">일정 없음</div>'
       :sc.map(s=>{
         const isDone=!!s.done;
+        if(s.kind==='leave'){
+          return '<div class="ditem leave"'+(canEdit?' onclick="openEditSched(\''+s.id+'\')"':'')+'>'
+            +'<div class="di-name" style="font-weight:700">🏖️ '+escH(s.name||'연차')+'</div></div>';
+        }
         return '<div class="ditem'+(isDone?' done':'')+'">'
           +'<div class="ditem-check'+(isDone?' checked':'')+'" onclick="toggleDone(\''+s.id+'\',event)"></div>'
           +'<div class="ditem-body" data-id="'+s.id+'"'
@@ -903,10 +976,50 @@ async function saveAddSched(){
   S.schedules.push(s); closeModal(); render(); await fbSaveSchedule(s);
 }
 
+/* ── 연차 등록 ── */
+function openAddLeave(){
+  if(!isAdmin()) return;
+  if(!S.technicians.length){ alert('기사를 먼저 등록하세요.'); return; }
+  const tid=S.activeTechId||S.technicians[0].id;
+  const opts=S.technicians.map(t=>'<option value="'+t.id+'"'+(t.id===tid?' selected':'')+'>'+escH(t.name)+'</option>').join('');
+  const today=ds(S.currentDate);
+  showModal('<div class="modal" onclick="event.stopPropagation()">'
+    +'<h3><i class="ti ti-calendar-off" style="color:var(--primary)"></i> 연차 등록</h3>'
+    +'<div class="form-row"><label>기사</label><select id="lv-t">'+opts+'</select></div>'
+    +'<div class="form-row"><label>시작일</label><input type="date" id="lv-s" value="'+today+'"></div>'
+    +'<div class="form-row"><label>종료일 (하루만 쉬면 시작일과 같게)</label><input type="date" id="lv-e" value="'+today+'"></div>'
+    +'<div class="form-row"><label>구분</label><input id="lv-n" value="연차" placeholder="예) 연차 / 반차 / 병가"></div>'
+    +'<div id="lv-st" style="font-size:12px;min-height:18px"></div>'
+    +'<div class="form-actions"><button class="btn" onclick="closeModal()">취소</button>'
+    +'<button class="btn primary" onclick="saveAddLeave()"><i class="ti ti-check"></i> 등록</button></div>'
+    +'</div>');
+}
+async function saveAddLeave(){
+  const techId=document.getElementById('lv-t').value;
+  const sv=document.getElementById('lv-s').value, ev=document.getElementById('lv-e').value;
+  const label=(document.getElementById('lv-n').value||'연차').trim().slice(0,20);
+  const st=document.getElementById('lv-st');
+  if(!sv||!ev){ st.innerHTML='<span style="color:#b91c1c">날짜를 입력하세요.</span>'; return; }
+  if(ev<sv){ st.innerHTML='<span style="color:#b91c1c">종료일이 시작일보다 빠릅니다.</span>'; return; }
+  const made=[];
+  for(let d=parseDs(sv); ds(d)<=ev; d.setDate(d.getDate()+1)){
+    const dStr=ds(d);
+    // 같은 날 같은 기사에게 이미 연차가 있으면 건너뛴다
+    if(S.schedules.some(x=>x.techId===techId&&x.date===dStr&&x.kind==='leave')) continue;
+    made.push({id:uid(),techId,name:label,region:'',memo:'',date:dStr,
+      startHour:HOURS[0],startMin:0,duration:HOURS.length*60,done:false,kind:'leave'});
+  }
+  if(!made.length){ st.innerHTML='<span style="color:#b91c1c">이미 등록된 연차입니다.</span>'; return; }
+  made.forEach(s=>S.schedules.push(s));
+  closeModal(); render();
+  for(const s of made) await fbSaveSchedule(s);
+}
+
 /* ── 스케줄 수정 ── */
 function openEditSched(id){
   const s=S.schedules.find(x=>x.id===id); if(!s) return;
   const canEdit=isAdmin()||(S.userTechId===s.techId); if(!canEdit) return;
+  if(s.kind==='leave'){ openEditLeave(s); return; }
   const opts=S.technicians.map(t=>'<option value="'+t.id+'"'+(t.id===s.techId?' selected':'')+'>'+escH(t.name)+'</option>').join('');
   showModal('<div class="modal" onclick="event.stopPropagation()">'
     +'<h3><i class="ti ti-edit" style="color:var(--primary)"></i> 스케줄 수정</h3>'
@@ -941,6 +1054,28 @@ async function deleteSched(id){
   if(!confirm('이 스케줄을 삭제할까요?')) return;
   S.schedules=S.schedules.filter(x=>x.id!==id);
   closeModal(); render(); await fbDeleteSchedule(s);
+}
+
+/* ── 연차 수정 (거래처·시간이 없으므로 별도 창) ── */
+function openEditLeave(s){
+  const t=getTech(s.techId);
+  showModal('<div class="modal" onclick="event.stopPropagation()">'
+    +'<h3><i class="ti ti-calendar-off" style="color:var(--primary)"></i> 연차 수정</h3>'
+    +'<div class="form-row"><label>기사</label><input value="'+escH(t?.name||'')+'" disabled></div>'
+    +'<div class="form-row"><label>구분</label><input id="el-n" value="'+escH(s.name||'연차')+'"></div>'
+    +'<div class="form-row"><label>날짜</label><input type="date" id="el-d" value="'+s.date+'"></div>'
+    +'<div class="form-actions">'
+    +(isAdmin()?'<button class="btn danger" onclick="deleteSched(\''+s.id+'\')"><i class="ti ti-trash"></i> 삭제</button>':'')
+    +'<button class="btn" onclick="closeModal()">취소</button>'
+    +'<button class="btn primary" onclick="saveEditLeave(\''+s.id+'\')"><i class="ti ti-check"></i> 저장</button></div></div>');
+}
+async function saveEditLeave(id){
+  const s=S.schedules.find(x=>x.id===id); if(!s) return;
+  const up={...s,
+    name:(document.getElementById('el-n').value||'연차').trim().slice(0,20),
+    date:document.getElementById('el-d').value};
+  S.schedules=S.schedules.map(x=>x.id===id?up:x);
+  closeModal(); render(); await fbSaveSchedule(up);
 }
 
 /* ── 기사 관리 ── */

@@ -1,6 +1,6 @@
 // 파브르 스케줄 Service Worker
 // 앱을 수정할 때마다 아래 버전 숫자를 올리세요 (v2 → v3 → ...)
-const CACHE_NAME = 'pabre-schedule-v3';
+const CACHE_NAME = 'pabre-schedule-v4';
 
 // 오프라인에서도 앱 화면이 뜨도록 미리 받아두는 파일
 const PRECACHE = [

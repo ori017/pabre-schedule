@@ -90,6 +90,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .tech-strip::-webkit-scrollbar{height:3px}
 .tech-tab{display:flex;align-items:center;gap:5px;padding:8px 12px;font-size:12px;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;color:var(--text2);flex-shrink:0}
 .tech-tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:500}
+.tab-cnt{font-size:10px;font-weight:600;background:var(--bg3);color:var(--text2);border-radius:9px;padding:1px 6px;min-width:18px;text-align:center}
+.tech-tab.active .tab-cnt{background:var(--primary);color:#fff}
 .tech-tab:hover:not(.active){background:var(--bg2)}
 .tdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .tab-sep{width:1px;height:20px;background:var(--border);margin:0 4px;flex-shrink:0}
@@ -116,7 +118,24 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 /* DATE NAV */
 .date-nav{display:flex;align-items:center;gap:4px}
 .nav-btn{padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);cursor:pointer;font-size:12px;color:var(--text2)}
-.date-label{font-size:12px;font-weight:500;min-width:130px;text-align:center;white-space:nowrap}
+.date-label{font-size:12px;font-weight:500;min-width:130px;text-align:center;white-space:nowrap;
+  border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);
+  cursor:pointer;padding:5px 8px;font-family:inherit}
+.date-label:hover{background:var(--bg2);border-color:var(--border2)}
+/* DATE PICKER 팝업 */
+.dp-modal{width:300px;padding:16px}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px}
+.dp-sel{display:flex;gap:5px;flex:1;justify-content:center}
+.dp-sel select{padding:5px 6px;border:1px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);cursor:pointer}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-dow{text-align:center;font-size:11px;font-weight:600;padding:4px 0}
+.dp-cell{text-align:center;font-size:13px;padding:8px 0;border-radius:8px;cursor:pointer;color:var(--text)}
+.dp-cell.empty{cursor:default}
+.dp-cell:not(.empty):hover{background:var(--bg3)}
+.dp-cell.sun{color:#d4537e}
+.dp-cell.sat{color:#378add}
+.dp-cell.today{outline:1.5px solid var(--primary);outline-offset:-2px;font-weight:700}
+.dp-cell.sel{background:var(--primary);color:#fff!important;font-weight:700}
 /* WEEK */
 /* 가로 스크롤 영역.
    오른쪽 여백은 padding 대신 ::after 로 만든다 — 모바일 브라우저가 스크롤 영역의
@@ -349,6 +368,13 @@ function schedsFor(techId,date){
 function allSchedsFor(date){
   const dS=typeof date==='string'?date:ds(date);
   return S.schedules.filter(s=>s.date===dS);
+}
+/* 특정 기사의 특정 연·월 일정 수 (연차·중지 제외한 실제 소독 건수) */
+function monthCount(techId, dateObj){
+  const pre=dateObj.getFullYear()+'-'+String(dateObj.getMonth()+1).padStart(2,'0');
+  return S.schedules.filter(s=>
+    s.techId===techId && s.date.startsWith(pre) && s.kind!=='leave' && !s.paused
+  ).length;
 }
 
 /* ════════════════════════════════════════════
@@ -593,17 +619,19 @@ function buildApp(){
 
   const techTabs=isAdmin()?`
     <div class="tech-strip">
-      <div class="tech-tab${S.activeTechId===null?' active':''}" onclick="setTech(null)">전체</div>
+      <div class="tech-tab${S.activeTechId===null?' active':''}" onclick="setTech(null)">전체<span class="tab-cnt">${S.technicians.reduce((a,t)=>a+monthCount(t.id,S.currentDate),0)}</span></div>
       <div class="tab-sep"></div>
-      ${S.technicians.map(t=>{const c=clr(t.colorId);return`<div class="tech-tab${S.activeTechId===t.id?' active':''}" onclick="setTech('${t.id}')"><span class="tdot" style="background:${c.dot}"></span>${escH(t.name)}</div>`;}).join('')}
+      ${S.technicians.map(t=>{const c=clr(t.colorId);const mc=monthCount(t.id,S.currentDate);return`<div class="tech-tab${S.activeTechId===t.id?' active':''}" onclick="setTech('${t.id}')"><span class="tdot" style="background:${c.dot}"></span>${escH(t.name)}<span class="tab-cnt" title="${S.currentDate.getMonth()+1}월 일정 수">${mc}</span></div>`;}).join('')}
       <div class="tab-add-btn" onclick="openAddTech()" title="기사 추가">＋</div>
-      <span class="tech-count">${S.technicians.length}/${MAX_TECHS}</span>
+      <span class="tech-count">기사 ${S.technicians.length}/${MAX_TECHS} · 숫자는 ${S.currentDate.getMonth()+1}월 일정 수</span>
     </div>`
     :`<div class="tech-strip">
       <div class="tech-tab active" style="border-bottom-color:${myTech?clr(myTech.colorId).dot:'var(--primary)'}">
         <span class="tdot" style="background:${myTech?clr(myTech.colorId).dot:'var(--primary)'}"></span>
         ${escH(myTech?.name||'내 일정')}
+        ${myTech?`<span class="tab-cnt" title="${S.currentDate.getMonth()+1}월 일정 수">${monthCount(myTech.id,S.currentDate)}</span>`:''}
       </div>
+      <span class="tech-count">숫자는 ${S.currentDate.getMonth()+1}월 일정 수</span>
     </div>`;
 
   return `<div class="app">
@@ -616,7 +644,7 @@ function buildApp(){
       </div>
       <div class="date-nav">
         <button class="nav-btn" onclick="navDate(-1)">◀</button>
-        <span class="date-label">${labels[vm]}</span>
+        <button class="date-label" onclick="openDatePicker(event)" title="날짜 선택">${labels[vm]} <i class="ti ti-chevron-down" style="font-size:12px;vertical-align:-1px"></i></button>
         <button class="nav-btn" onclick="navDate(1)">▶</button>
         <button class="btn sm" onclick="goToday()">오늘</button>
       </div>
@@ -1535,6 +1563,68 @@ async function doChangePw(){
 function setView(v){S.viewMode=v;render();}
 function setTech(id){S.activeTechId=id;render();}
 function goToday(){S.currentDate=new Date();render();}
+
+/* ── 날짜 선택 달력 팝업 ── */
+let _pick = null;   // 팝업에서 보고 있는 연·월
+function openDatePicker(e){
+  e.stopPropagation();
+  _pick = new Date(S.currentDate.getFullYear(), S.currentDate.getMonth(), 1);
+  renderDatePicker();
+}
+function pickNavMonth(delta){
+  _pick = new Date(_pick.getFullYear(), _pick.getMonth()+delta, 1);
+  renderDatePicker();
+}
+function pickYear(y){ _pick=new Date(y, _pick.getMonth(), 1); renderDatePicker(); }
+function pickChooseMonth(mo){ _pick=new Date(_pick.getFullYear(), mo, 1); renderDatePicker(); }
+
+function renderDatePicker(){
+  const y=_pick.getFullYear(), m=_pick.getMonth();
+  const first=new Date(y,m,1), last=new Date(y,m+1,0), pad=first.getDay();
+  const tds=todayDs(), selDs=ds(S.currentDate);
+
+  // 연도 선택(현재 기준 앞뒤 3년)
+  const cy=new Date().getFullYear();
+  let yopts='';
+  for(let yy=cy-2; yy<=cy+3; yy++) yopts+='<option value="'+yy+'"'+(yy===y?' selected':'')+'>'+yy+'년</option>';
+  let mopts='';
+  for(let mm=0; mm<12; mm++) mopts+='<option value="'+mm+'"'+(mm===m?' selected':'')+'>'+(mm+1)+'월</option>';
+
+  let cells='';
+  for(let i=0;i<7;i++){
+    const col=(i===0?'#d4537e':(i===6?'#378add':'var(--text2)'));
+    cells+='<div class="dp-dow" style="color:'+col+'">'+DAYS_KO[i]+'</div>';
+  }
+  for(let i=0;i<pad;i++) cells+='<div class="dp-cell empty"></div>';
+  for(let d=1; d<=last.getDate(); d++){
+    const dStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const dow=new Date(y,m,d).getDay();
+    const cls=['dp-cell'];
+    if(dStr===selDs) cls.push('sel');
+    if(dStr===tds) cls.push('today');
+    if(dow===0) cls.push('sun'); if(dow===6) cls.push('sat');
+    cells+='<div class="'+cls.join(' ')+'" onclick="pickDate(\''+dStr+'\')">'+d+'</div>';
+  }
+
+  showModal('<div class="modal dp-modal" onclick="event.stopPropagation()">'
+    +'<div class="dp-head">'
+    +'<button class="nav-btn" onclick="pickNavMonth(-1)">◀</button>'
+    +'<div class="dp-sel">'
+    +'<select onchange="pickYear(parseInt(this.value))">'+yopts+'</select>'
+    +'<select onchange="pickChooseMonth(parseInt(this.value))">'+mopts+'</select>'
+    +'</div>'
+    +'<button class="nav-btn" onclick="pickNavMonth(1)">▶</button>'
+    +'</div>'
+    +'<div class="dp-grid">'+cells+'</div>'
+    +'<div class="form-actions"><button class="btn" onclick="pickDate(\''+tds+'\')">오늘로</button>'
+    +'<button class="btn" onclick="closeModal()">닫기</button></div>'
+    +'</div>');
+}
+function pickDate(dStr){
+  S.currentDate = parseDs(dStr);
+  closeModal();
+  render();
+}
 function navDate(delta){
   const d=S.currentDate;
   if(S.viewMode==='week') d.setDate(d.getDate()+delta*7);

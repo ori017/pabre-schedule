@@ -198,6 +198,13 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .ditem{border-radius:6px;padding:5px 7px;margin-bottom:4px;display:flex;align-items:flex-start;gap:6px;transition:opacity 0.1s}
 .ditem.done{opacity:0.4;filter:saturate(0.3)}
 .ditem.leave{background:repeating-linear-gradient(45deg,#FAEEDA,#FAEEDA 6px,#F5E4C8 6px,#F5E4C8 12px);color:#7a5a10;justify-content:center;cursor:pointer;padding:7px}
+/* 소독 중지 매장 */
+.ditem.paused{background:#9a9a96;color:#fff;cursor:pointer}
+.ditem.paused .di-region,.ditem.paused .di-name{color:#fff}
+.ditem.paused .di-memo{background:rgba(255,255,255,0.2);color:#fff}
+.di-pause{font-size:9px;font-weight:700;background:rgba(0,0,0,0.25);border-radius:3px;padding:2px 5px;flex-shrink:0;margin-top:1px}
+.mchip.paused .mchip-time{font-weight:700}
+.wg-block.paused{opacity:0.85}
 .ditem-check{width:16px;height:16px;border-radius:4px;border:2px solid #aaa;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;margin-top:1px;transition:all 0.12s}
 .ditem-check.checked{background:var(--primary);border-color:var(--primary)}
 .ditem-check.checked::after{content:"\2713";font-size:10px;color:#fff;font-weight:700;line-height:1}
@@ -218,6 +225,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .form-row label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;font-weight:500}
 .form-row input,.form-row select{width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text);font-family:inherit}
 .form-row input:focus,.form-row select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--pl)}
+.chk-row{display:flex!important;align-items:center;gap:7px;font-size:12px!important;color:var(--text)!important;cursor:pointer;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)}
+.chk-row input[type=checkbox]{width:16px!important;height:16px;accent-color:var(--primary);margin:0;flex-shrink:0}
 .form-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
 .color-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
 .cswatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.1s}
@@ -327,10 +336,15 @@ function weekDays(ws){return Array.from({length:7},(_,i)=>{const d=new Date(ws);
 function todayDs(){return ds(new Date());}
 function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function isAdmin(){return S.userRole==='admin';}
+/* 정렬 기준: 중지된 매장은 항상 맨 아래로, 나머지는 시간 순 */
+function cmpSched(a,b){
+  const pa=a.paused?1:0, pb=b.paused?1:0;
+  if(pa!==pb) return pa-pb;
+  return (a.startHour*60+a.startMin)-(b.startHour*60+b.startMin);
+}
 function schedsFor(techId,date){
   const dS=typeof date==='string'?date:ds(date);
-  return S.schedules.filter(s=>s.techId===techId&&s.date===dS)
-    .sort((a,b)=>a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
+  return S.schedules.filter(s=>s.techId===techId&&s.date===dS).sort(cmpSched);
 }
 function allSchedsFor(date){
   const dS=typeof date==='string'?date:ds(date);
@@ -681,8 +695,12 @@ function buildWeekBlock(s, c, SLOT_H, MINI_H, canEdit, lay) {
   var idx  = (lay && lay.idx) ? lay.idx : 0;
   var w    = 100/cnt;
   var side = 'left:calc('+(idx*w)+'% + 2px);width:calc('+w+'% - 4px);right:auto;';
-  return '<div class="wg-block'+(done?' done':'')+(cnt>1?' narrow':'')+'"'
-    +' style="'+side+'top:'+tp+'px;height:'+ht+'px;background:'+c.bg+';color:'+c.text+';border:1px solid '+c.border+'"'
+  var bg   = s.paused ? '#9a9a96' : c.bg;      // 중지된 매장은 진한 회색
+  var fg   = s.paused ? '#fff'    : c.text;
+  var bd   = s.paused ? '#7e7e7a' : c.border;
+  if(s.paused) bt = '중지';
+  return '<div class="wg-block'+(done?' done':'')+(cnt>1?' narrow':'')+(s.paused?' paused':'')+'"'
+    +' style="'+side+'top:'+tp+'px;height:'+ht+'px;background:'+bg+';color:'+fg+';border:1px solid '+bd+'"'
     +' data-id="'+s.id+'"'+drag+clk
     +' onmouseenter="showTip(event,\''+s.id+'\')" onmouseleave="hideTip()">'
     +'<div class="bname'+(done?' strike':'')+'">' +nm+ '</div>'
@@ -768,7 +786,7 @@ function buildMonth(){
     const dStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
     const isT=dStr===tds;
     const scheds=(S.activeTechId?schedsFor(S.activeTechId,dStr):allSchedsFor(dStr))
-      .slice().sort((a,b)=>a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
+      .slice().sort(cmpSched);   // 중지 매장은 맨 아래로
     const chips=scheds.map(s=>{
       const t2=getTech(s.techId); const c=clr(t2?.colorId??0); const done=!!s.done;
       const canEdit=isAdmin()||(S.userTechId===s.techId);
@@ -779,14 +797,16 @@ function buildMonth(){
       }
       // 지역·메모를 마우스 없이도 바로 볼 수 있도록 둘째 줄에 표시한다
       const sub=[s.region||'', s.memo?('📌 '+s.memo):''].filter(Boolean).join(' · ');
-      return '<div class="mchip'+(done?' done':'')+'"'
-        +' style="background:'+c.bg+';color:'+c.text+'"'
+      const bg = s.paused ? '#9a9a96' : c.bg;      // 중지된 매장은 진한 회색
+      const fg = s.paused ? '#fff'    : c.text;
+      return '<div class="mchip'+(done?' done':'')+(s.paused?' paused':'')+'"'
+        +' style="background:'+bg+';color:'+fg+'"'
         +' data-id="'+s.id+'"'
         +' draggable="'+canEdit+'"'
         +' onclick="'+(canEdit?'openEditSched(\''+s.id+'\')':'')+'"'
         +' ondragstart="onDragStart(event,\''+s.id+'\')" ondragend="onDragEnd()">'
         +'<div class="mc-top">'
-        +'<span class="mchip-time">'+ft(s.startHour,s.startMin)+'</span>'
+        +'<span class="mchip-time">'+(s.paused?'중지':ft(s.startHour,s.startMin))+'</span>'
         +'<span class="mchip-name'+(done?' strike':'')+'">'+escH(s.name)+'</span>'
         +'</div>'
         +(sub?'<div class="mc-sub">'+escH(sub)+'</div>':'')
@@ -810,7 +830,8 @@ function buildDailyAll(){
   if(!techs.length) return '<div class="no-data"><i class="ti ti-calendar-off"></i><p>일정이 없습니다.</p></div>';
   return '<div class="daily-grid">'+techs.map(t=>{
     const c=clr(t.colorId); const sc=schedsFor(t.id,dStr);
-    const wk=sc.filter(s=>s.kind!=='leave');   // 연차는 일감 수에서 제외
+    // 연차와 중지 매장은 '해야 할 일'이 아니므로 진행률 계산에서 뺀다
+    const wk=sc.filter(s=>s.kind!=='leave' && !s.paused);
     const done=wk.filter(s=>s.done).length; const pct=wk.length?Math.round(done/wk.length*100):0;
     const canEdit=isAdmin()||(S.userTechId===t.id);
     const items=sc.length===0?'<div class="dempty">일정 없음</div>'
@@ -819,6 +840,15 @@ function buildDailyAll(){
         if(s.kind==='leave'){
           return '<div class="ditem leave"'+(canEdit?' onclick="openEditSched(\''+s.id+'\')"':'')+'>'
             +'<div class="di-name" style="font-weight:700">🏖️ '+escH(s.name||'연차')+'</div></div>';
+        }
+        if(s.paused){
+          return '<div class="ditem paused"'+(canEdit?' onclick="openEditSched(\''+s.id+'\')"':'')+'>'
+            +'<div class="di-pause">중지</div>'
+            +'<div class="ditem-body">'
+            +'<div class="di-name">'+escH(s.name)+'</div>'
+            +(s.region?'<div class="di-region">'+escH(s.region)+'</div>':'')
+            +(s.memo?'<div class="di-memo">📌 '+escH(s.memo)+'</div>':'')
+            +'</div></div>';
         }
         return '<div class="ditem'+(isDone?' done':'')+'">'
           +'<div class="ditem-check'+(isDone?' checked':'')+'" onclick="toggleDone(\''+s.id+'\',event)"></div>'
@@ -1063,6 +1093,7 @@ function openEditSched(id){
     +'<div class="form-row"><label>날짜</label><input type="date" id="es-d" value="'+s.date+'"></div>'
     +'<div class="form-row"><label>시작 시간</label><input type="time" id="es-time" value="'+ft(s.startHour,s.startMin)+'"></div>'
     +'<div class="form-row"><label>소요시간(분)</label><input type="number" id="es-dur" value="'+s.duration+'" min="15" step="15"></div>'
+    +'<div class="form-row"><label class="chk-row"><input type="checkbox" id="es-p"'+(s.paused?' checked':'')+'> 소독 중지 중인 매장 (목록 맨 아래로 내려갑니다)</label></div>'
     +'<div class="form-actions">'
     +(isAdmin()?'<button class="btn danger" onclick="deleteSched(\''+id+'\')"><i class="ti ti-trash"></i> 삭제</button>':'')
     +'<button class="btn" onclick="closeModal()">취소</button>'
@@ -1076,6 +1107,7 @@ async function saveEditSched(id){
   const oldTechId=s.techId;
   const up={...s,name,region:document.getElementById('es-r').value.trim(),
     memo:document.getElementById('es-m').value.trim(),
+    paused:document.getElementById('es-p').checked,
     techId:document.getElementById('es-t').value,date:document.getElementById('es-d').value,
     startHour:h,startMin:m,duration:parseInt(document.getElementById('es-dur').value)||60};
   S.schedules=S.schedules.map(x=>x.id===id?up:x);
@@ -1294,11 +1326,12 @@ async function handleUpload(e){
         const [h,m]=normTime(row['시작시간']);
         const dur=parseInt(row['소요시간'])||60, region=String(row['지역']??'').trim();
         const memo=String(row['메모']??'').trim().slice(0,200);
+        const paused=/중지|정지|중단/.test(String(row['중지']??''));
         if(!name||!date){skipped++;continue;}
         let t=S.technicians.find(x=>x.name===tn);
         if(!t&&tn&&S.technicians.length<MAX_TECHS){t={id:tuid(),name:tn,colorId:S.technicians.length%PALETTE.length,defaultDuration:60};S.technicians.push(t);await fbSaveTech(t);}
         if(!t)t=S.technicians[0]; if(!t){skipped++;continue;}
-        const s={id:uid(),techId:t.id,name,region,memo,date,startHour:h,startMin:m,duration:dur,done:false};
+        const s={id:uid(),techId:t.id,name,region,memo,paused,date,startHour:h,startMin:m,duration:dur,done:false};
         S.schedules.push(s); await fbSaveSchedule(s); added++;
       }
       setBusy(false);
@@ -1316,16 +1349,16 @@ function exportExcel(){
   S.technicians.forEach(t=>{
     const rows=S.schedules.filter(s=>s.techId===t.id)
       .sort((a,b)=>a.date.localeCompare(b.date)||a.startHour*60+a.startMin-(b.startHour*60+b.startMin))
-      .map(s=>({'기사명':t.name,'날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','완료':s.done?'완료':''}));
-    if(!rows.length) rows.push({'기사명':t.name,'날짜':'','시작시간':'','종료시간':'','소요시간':'','거래처명':'(없음)','지역':'','메모':'','완료':''});
+      .map(s=>({'기사명':t.name,'날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','중지':s.paused?'중지':'','완료':s.done?'완료':''}));
+    if(!rows.length) rows.push({'기사명':t.name,'날짜':'','시작시간':'','종료시간':'','소요시간':'','거래처명':'(없음)','지역':'','메모':'','중지':'','완료':''});
     const ws=XLSX.utils.json_to_sheet(rows);
-    ws['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6}];
+    ws['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6},{wch:6}];
     XLSX.utils.book_append_sheet(wb,ws,t.name.slice(0,28));
   });
   const allR=S.schedules.sort((a,b)=>a.date.localeCompare(b.date)||a.startHour*60+a.startMin-(b.startHour*60+b.startMin))
-    .map(s=>{const t=getTech(s.techId);return{'기사명':t?.name||'','날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','완료':s.done?'완료':''};});
+    .map(s=>{const t=getTech(s.techId);return{'기사명':t?.name||'','날짜':s.date,'시작시간':ft(s.startHour,s.startMin),'종료시간':endT(s),'소요시간':s.duration,'거래처명':s.name,'지역':s.region||'','메모':s.memo||'','중지':s.paused?'중지':'','완료':s.done?'완료':''};});
   const wsa=XLSX.utils.json_to_sheet(allR.length?allR:[{}]);
-  wsa['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6}];
+  wsa['!cols']=[{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:26},{wch:12},{wch:30},{wch:6},{wch:6}];
   XLSX.utils.book_append_sheet(wb,wsa,'전체통합');
   XLSX.writeFile(wb,'PABRE_스케줄_'+S.currentDate.getFullYear()+String(S.currentDate.getMonth()+1).padStart(2,'0')+'.xlsx');
 }
@@ -1378,7 +1411,7 @@ function exportMonthImage(){
   for(let d=1;d<=last.getDate();d++){
     const dStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const sc=(S.activeTechId?schedsFor(S.activeTechId,dStr):allSchedsFor(dStr))
-      .slice().sort((a,b)=>a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
+      .slice().sort(cmpSched);
     byDay[d]=sc; if(sc.length>maxItems) maxItems=sc.length;
   }
 
@@ -1442,20 +1475,21 @@ function exportMonthImage(){
           x.fillText(fitTxt(x,'🏖 연차',bw-10), cx+11, ly+7);
           continue;
         }
-        x.fillStyle=col.bg;  x.fillRect(cx+6,ly,bw,ITEM-4);
-        x.fillStyle=col.dot; x.fillRect(cx+6,ly,3,ITEM-4);
+        const pz=!!s.paused;                                  // 중지된 매장
+        x.fillStyle=pz?'#9a9a96':col.bg;  x.fillRect(cx+6,ly,bw,ITEM-4);
+        x.fillStyle=pz?'#6f6f6b':col.dot; x.fillRect(cx+6,ly,3,ITEM-4);
 
         // 첫 줄: 시간 + 거래처명
-        x.fillStyle=col.text; x.font='600 11px '+F;
-        let label=ft(s.startHour,s.startMin)+' '+(S.activeTechId?'':'['+(t2?t2.name:'')+'] ')+s.name;
-        if(s.done) label='✓ '+label;
+        x.fillStyle=pz?'#fff':col.text; x.font='600 11px '+F;
+        let label=(pz?'중지':ft(s.startHour,s.startMin))+' '+(S.activeTechId?'':'['+(t2?t2.name:'')+'] ')+s.name;
+        if(s.done&&!pz) label='✓ '+label;
         x.fillText(fitTxt(x,label,bw-14), cx+13, ly+2);
 
         // 둘째 줄: 지역 · 메모
         const sub=[s.region||'', s.memo?('📌 '+s.memo):''].filter(Boolean).join(' · ');
         if(sub){
           x.font='9px '+F;
-          x.globalAlpha=0.72;
+          x.globalAlpha=pz?0.9:0.72;
           x.fillText(fitTxt(x,sub,bw-14), cx+13, ly+16);
           x.globalAlpha=1;
         }
